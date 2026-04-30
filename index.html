@@ -245,76 +245,78 @@
 
   let currentUser = null;
 
-  const loginError = document.getElementById('login-error');
-  const btnLogin   = document.getElementById('btn-login');
-  const inputEmail = document.getElementById('input-email');
-  const inputPwd   = document.getElementById('input-password');
+  document.addEventListener('DOMContentLoaded', () => {
+    const loginError = document.getElementById('login-error');
+    const btnLogin   = document.getElementById('btn-login');
+    const inputEmail = document.getElementById('input-email');
+    const inputPwd   = document.getElementById('input-password');
 
-  function showLoginError(msg) { loginError.textContent = msg; loginError.classList.add('visible'); }
-  function hideLoginError()    { loginError.classList.remove('visible'); }
+    function showLoginError(msg) { loginError.textContent = msg; loginError.classList.add('visible'); }
+    function hideLoginError()    { loginError.classList.remove('visible'); }
 
-  async function doLogin() {
-    const email    = inputEmail.value.trim();
-    const password = inputPwd.value;
-    if (!email || !password) { showLoginError('Preencha email e senha.'); return; }
+    async function doLogin() {
+      const email    = inputEmail.value.trim();
+      const password = inputPwd.value;
+      if (!email || !password) { showLoginError('Preencha email e senha.'); return; }
 
-    btnLogin.disabled = true;
-    btnLogin.textContent = 'Entrando...';
-    hideLoginError();
+      btnLogin.disabled = true;
+      btnLogin.textContent = 'Entrando...';
+      hideLoginError();
 
-    try {
-      const res = await fetch(AUTH_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': AUTH_KEY },
-        body: JSON.stringify({ action: 'login', email, password })
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        localStorage.setItem('dt_transcriber_user', JSON.stringify(data.user));
-        inputPwd.value = '';
-        startApp(data.user);
-      } else {
-        showLoginError(data.error || 'Email ou senha incorretos.');
+      try {
+        const res = await fetch(AUTH_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': AUTH_KEY },
+          body: JSON.stringify({ action: 'login', email, password })
+        });
+        const data = await res.json();
+        if (data.success && data.user) {
+          localStorage.setItem('dt_transcriber_user', JSON.stringify(data.user));
+          inputPwd.value = '';
+          startApp(data.user);
+        } else {
+          showLoginError(data.error || 'Email ou senha incorretos.');
+        }
+      } catch(e) {
+        showLoginError('Erro de conexão. Tente novamente.');
+      } finally {
+        btnLogin.disabled = false;
+        btnLogin.textContent = 'Entrar';
       }
-    } catch(e) {
-      showLoginError('Erro de conexão. Certifique-se de ter aceito o certificado (veja o aviso abaixo).');
-    } finally {
-      btnLogin.disabled = false;
-      btnLogin.textContent = 'Entrar';
     }
-  }
 
-  function startApp(user) {
-    currentUser = user;
-    document.getElementById('header-user').textContent = user.name;
-    document.getElementById('btn-logout').hidden = false;
-    document.getElementById('login-screen').hidden = true;
-    document.getElementById('app-screen').hidden = false;
-  }
+    function startApp(user) {
+      currentUser = user;
+      document.getElementById('header-user').textContent = user.name;
+      document.getElementById('btn-logout').hidden = false;
+      document.getElementById('login-screen').hidden = true;
+      document.getElementById('app-screen').hidden = false;
+    }
 
-  function doLogout() {
-    localStorage.removeItem('dt_transcriber_user');
-    currentUser = null;
-    document.getElementById('header-user').textContent = '';
-    document.getElementById('btn-logout').hidden = true;
-    document.getElementById('app-screen').hidden = true;
-    document.getElementById('login-screen').hidden = false;
-    inputEmail.value = '';
-    inputPwd.value = '';
-    hideLoginError();
-  }
+    function doLogout() {
+      localStorage.removeItem('dt_transcriber_user');
+      currentUser = null;
+      document.getElementById('header-user').textContent = '';
+      document.getElementById('btn-logout').hidden = true;
+      document.getElementById('app-screen').hidden = true;
+      document.getElementById('login-screen').hidden = false;
+      inputEmail.value = '';
+      inputPwd.value = '';
+      hideLoginError();
+    }
 
-  btnLogin.addEventListener('click', doLogin);
-  inputPwd.addEventListener('keydown',   e => { if (e.key === 'Enter') doLogin(); });
-  inputEmail.addEventListener('keydown', e => { if (e.key === 'Enter') inputPwd.focus(); });
-  document.getElementById('btn-logout').addEventListener('click', doLogout);
+    btnLogin.addEventListener('click', doLogin);
+    inputPwd.addEventListener('keydown',   e => { if (e.key === 'Enter') doLogin(); });
+    inputEmail.addEventListener('keydown', e => { if (e.key === 'Enter') inputPwd.focus(); });
+    document.getElementById('btn-logout').addEventListener('click', doLogout);
 
-  // Restaura sessão salva
-  const _saved = localStorage.getItem('dt_transcriber_user');
-  if (_saved) {
-    try { startApp(JSON.parse(_saved)); }
-    catch(e) { localStorage.removeItem('dt_transcriber_user'); }
-  }
+    // Restaura sessão salva
+    const _saved = localStorage.getItem('dt_transcriber_user');
+    if (_saved) {
+      try { startApp(JSON.parse(_saved)); }
+      catch(e) { localStorage.removeItem('dt_transcriber_user'); }
+    }
+  });
 </script>
 
 <header>
