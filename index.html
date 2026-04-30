@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcritor de Reuniões — DTGBS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f4f4f4; color: #333; min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      background: #E2007A; color: #fff;
+      padding: 18px 32px; display: flex; align-items: center;
+      justify-content: space-between; gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.3px; }
+    header p  { font-size: 0.82rem; opacity: 0.85; margin-top: 2px; }
+
+    /* MAIN */
+    main { max-width: 820px; margin: 36px auto; padding: 0 16px 60px; }
+    .card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.09); padding: 32px; margin-bottom: 24px;
+    }
+
+    /* UPLOAD ZONE */
+    #drop-zone {
+      border: 2px dashed #ccc; border-radius: 10px; padding: 40px 24px;
+      text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s; position: relative;
+    }
+    #drop-zone:hover, #drop-zone.drag-over { border-color: #E2007A; background: #fff0f7; }
+    #drop-zone svg { color: #bbb; margin-bottom: 10px; }
+    #drop-zone p   { color: #666; font-size: 0.95rem; }
+    #drop-zone strong { color: #E2007A; }
+    #file-input { display: none; }
+
+    .file-selected {
+      margin-top: 14px; background: #f9f9f9; border: 1px solid #e0e0e0;
+      border-radius: 8px; padding: 10px 14px; font-size: 0.88rem;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .file-icon { color: #E2007A; font-size: 1.2rem; }
+    .file-size-warn { color: #c0392b; font-weight: 600; }
+
+    /* AVISO */
+    .size-warning {
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px;
+      padding: 10px 14px; font-size: 0.85rem; color: #5d4037;
+      margin-top: 14px; display: flex; gap: 8px; align-items: flex-start;
+    }
+
+    /* EXTRACTION STATUS */
+    #extraction-section {
+      display: none; margin-top: 14px;
+      background: #f0f7ff; border: 1px solid #b3d4f5;
+      border-radius: 8px; padding: 12px 16px;
+    }
+    .extraction-row { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; color: #1a5fa8; }
+    .extraction-row svg { flex-shrink: 0; animation: spin 1s linear infinite; }
+    .extraction-bar-bg {
+      background: #d0e8ff; border-radius: 100px; height: 5px;
+      overflow: hidden; margin-top: 8px;
+    }
+    .extraction-bar-fill {
+      height: 100%; background: #1a7fe8; border-radius: 100px;
+      width: 0%; transition: width 0.3s ease;
+    }
+    .extraction-done {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.88rem; color: #1a7f3c; font-weight: 600;
+    }
+
+    /* CONTROLS */
+    .controls {
+      display: flex; gap: 14px; margin-top: 22px;
+      flex-wrap: wrap; align-items: flex-end;
+    }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-group label { font-size: 0.82rem; font-weight: 600; color: #555; }
+    select {
+      padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 0.92rem; background: #fff; cursor: pointer; outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus { border-color: #E2007A; }
+
+    button#btn-transcribe {
+      flex: 1; min-width: 160px; padding: 12px 28px;
+      background: #E2007A; color: #fff; border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    button#btn-transcribe:hover:not(:disabled) { background: #c0006a; transform: translateY(-1px); }
+    button#btn-transcribe:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+
+    /* PROGRESS */
+    #progress-section { display: none; margin-top: 22px; }
+    .progress-label {
+      font-size: 0.85rem; color: #666; margin-bottom: 8px;
+      display: flex; justify-content: space-between;
+    }
+    .progress-bar-bg { background: #eee; border-radius: 100px; height: 8px; overflow: hidden; }
+    .progress-bar-fill {
+      height: 100%; background: linear-gradient(90deg, #E2007A, #ff6ab0);
+      border-radius: 100px; width: 0%;
+      animation: indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes indeterminate {
+      0%   { transform: translateX(-100%); width: 60%; }
+      50%  { transform: translateX(60%);   width: 60%; }
+      100% { transform: translateX(200%);  width: 60%; }
+    }
+    .progress-bar-fill.done { animation: none; width: 100%; }
+
+    /* ERROR */
+    #error-section {
+      background: #fdecea; border: 1px solid #f5c6cb; border-radius: 8px;
+      padding: 14px 18px; color: #b71c1c; font-size: 0.9rem;
+      margin-top: 18px; gap: 10px; align-items: flex-start;
+    }
+    #error-section.hidden { display: none; }
+    #error-section:not(.hidden) { display: flex; }
+
+    /* RESULT */
+    #result-section { display: none; }
+    .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 0; }
+    .tab-btn {
+      padding: 11px 24px; border: none; background: transparent;
+      font-size: 0.92rem; font-weight: 600; color: #888; cursor: pointer;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn.active { color: #E2007A; border-bottom-color: #E2007A; }
+    .tab-btn:hover:not(.active) { color: #333; }
+    .tab-panel { display: none; padding: 20px 0 0; }
+    .tab-panel.active { display: block; }
+    .result-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .badge {
+      background: #f4f4f4; border: 1px solid #e0e0e0; border-radius: 100px;
+      padding: 4px 12px; font-size: 0.78rem; color: #555;
+    }
+    .badge strong { color: #333; }
+    .result-box {
+      background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px;
+      padding: 18px 20px; font-size: 0.92rem; line-height: 1.7;
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 420px; overflow-y: auto; color: #222;
+    }
+    .result-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .btn-secondary {
+      padding: 8px 18px; border: 1.5px solid #E2007A; color: #E2007A;
+      background: transparent; border-radius: 7px; font-size: 0.85rem;
+      font-weight: 600; cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-secondary:hover { background: #E2007A; color: #fff; }
+
+    footer { text-align: center; font-size: 0.78rem; color: #aaa; padding: 20px; }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    @media (max-width: 560px) {
+      .card { padding: 20px; }
+      header { padding: 14px 18px; }
+      header h1 { font-size: 1.1rem; }
+      .controls { flex-direction: column; }
+      button#btn-transcribe { width: 100%; }
+    }
+
+    /* ── SCREENS ── */
+    [hidden] { display: none !important; }
+
+    /* ── LOGIN ── */
+    #login-screen {
+      min-height: calc(100vh - 60px);
+      display: flex; justify-content: center; align-items: center;
+      padding: 24px; background: #f4f4f4;
+    }
+    .login-card {
+      background: #fff; border-radius: 12px;
+      padding: 36px 32px; max-width: 380px; width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    }
+    .login-logo {
+      width: 48px; height: 48px; background: #E2007A;
+      border-radius: 12px; display: flex; align-items: center;
+      justify-content: center; font-weight: 700; font-size: 18px;
+      color: #fff; margin-bottom: 20px;
+    }
+    .login-card h2 { font-size: 22px; font-weight: 600; margin-bottom: 6px; color: #1a1a1a; }
+    .login-card > p { font-size: 14px; color: #6b6b6b; margin-bottom: 28px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .form-group label { font-size: 13px; font-weight: 500; color: #333; }
+    .form-group input {
+      padding: 10px 14px; border: 1.5px solid #e0e0e0;
+      border-radius: 10px; font-family: inherit; font-size: 14px;
+      outline: none; transition: border-color .2s;
+    }
+    .form-group input:focus { border-color: #E2007A; }
+    #btn-login {
+      width: 100%; padding: 12px; background: #E2007A; color: #fff;
+      border: none; border-radius: 10px; font-family: inherit;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      margin-top: 4px; transition: background .2s;
+    }
+    #btn-login:hover    { background: #c0006a; }
+    #btn-login:disabled { background: #bdbdbd; cursor: default; }
+    #login-error {
+      font-size: 13px; color: #d32f2f;
+      background: #fff3f3; border: 1px solid #ffcdd2;
+      border-radius: 8px; padding: 10px 12px;
+      margin-top: 14px; display: none;
+    }
+    #login-error.visible { display: block; }
+    #btn-logout {
+      background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
+      color: #fff; padding: 5px 14px; border-radius: 20px;
+      font-size: 12px; font-family: inherit; cursor: pointer;
+      transition: background .2s;
+    }
+    #btn-logout:hover { background: rgba(255,255,255,.35); }
+    #header-user { font-size: 13px; opacity: .85; }
+  </style>
+</head>
+<body>
+
+<script>
+  // ================================================================
+  // CONFIGURAÇÃO — altere a URL do webhook n8n aqui
+  // ================================================================
+  const WEBHOOK_URL = 'https://dtgbsn8n.eastus.cloudapp.azure.com/webhook/transcricao-reuniao';
+  const TIMEOUT_MS  = 10 * 60 * 1000; // 10 minutos
+
+  // ── LOGIN ────────────────────────────────────────────────────────
+  const AUTH_URL  = 'https://dtgbsn8n.eastus.cloudapp.azure.com/webhook/users';
+  const AUTH_KEY  = 'dt-sales-a7f3c9e2b1d48520';
+
+  let currentUser = null;
+
+  const loginError = document.getElementById('login-error');
+  const btnLogin   = document.getElementById('btn-login');
+  const inputEmail = document.getElementById('input-email');
+  const inputPwd   = document.getElementById('input-password');
+
+  function showLoginError(msg) { loginError.textContent = msg; loginError.classList.add('visible'); }
+  function hideLoginError()    { loginError.classList.remove('visible'); }
+
+  async function doLogin() {
+    const email    = inputEmail.value.trim();
+    const password = inputPwd.value;
+    if (!email || !password) { showLoginError('Preencha email e senha.'); return; }
+
+    btnLogin.disabled = true;
+    btnLogin.textContent = 'Entrando...';
+    hideLoginError();
+
+    try {
+      const res = await fetch(AUTH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': AUTH_KEY },
+        body: JSON.stringify({ action: 'login', email, password })
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        localStorage.setItem('dt_transcriber_user', JSON.stringify(data.user));
+        inputPwd.value = '';
+        startApp(data.user);
+      } else {
+        showLoginError(data.error || 'Email ou senha incorretos.');
+      }
+    } catch(e) {
+      showLoginError('Erro de conexão. Certifique-se de ter aceito o certificado (veja o aviso abaixo).');
+    } finally {
+      btnLogin.disabled = false;
+      btnLogin.textContent = 'Entrar';
+    }
+  }
+
+  function startApp(user) {
+    currentUser = user;
+    document.getElementById('header-user').textContent = user.name;
+    document.getElementById('btn-logout').hidden = false;
+    document.getElementById('login-screen').hidden = true;
+    document.getElementById('app-screen').hidden = false;
+  }
+
+  function doLogout() {
+    localStorage.removeItem('dt_transcriber_user');
+    currentUser = null;
+    document.getElementById('header-user').textContent = '';
+    document.getElementById('btn-logout').hidden = true;
+    document.getElementById('app-screen').hidden = true;
+    document.getElementById('login-screen').hidden = false;
+    inputEmail.value = '';
+    inputPwd.value = '';
+    hideLoginError();
+  }
+
+  btnLogin.addEventListener('click', doLogin);
+  inputPwd.addEventListener('keydown',   e => { if (e.key === 'Enter') doLogin(); });
+  inputEmail.addEventListener('keydown', e => { if (e.key === 'Enter') inputPwd.focus(); });
+  document.getElementById('btn-logout').addEventListener('click', doLogout);
+
+  // Restaura sessão salva
+  const _saved = localStorage.getItem('dt_transcriber_user');
+  if (_saved) {
+    try { startApp(JSON.parse(_saved)); }
+    catch(e) { localStorage.removeItem('dt_transcriber_user'); }
+  }
+</script>
+
+<header>
+  <div style="background:white; padding:5px 10px; border-radius:6px; display:flex; align-items:center;">
+  <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAAAAAAD/4QBCRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAkAAAAMAAAABAAAAAEABAAEAAAABAAAAAAAAAAAAAP/bAEMACwkJBwkJBwkJCQkLCQkJCQkJCwkLCwwLCwsMDRAMEQ4NDgwSGRIlGh0lHRkfHCkpFiU3NTYaKjI+LSkwGTshE//bAEMBBwgICwkLFQsLFSwdGR0sLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLP/AABEIAdkB2gMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AOeJNGTQaK90/dgyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaMmiigAyaXJpKWgpCGig0UEhRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUtJS0DQhooNFAgooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKWkpaBoQ0UGigQUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFLSUtA0IaKDRQIKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClpKWgaENFBooEFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFTWtpd3swgtIXmmYMwSMZYhRknFaH/CN+Jv+gVd/wDfH/16lyS3ZhUxFGm+Wc0n5tIyaK1v+Eb8Tf8AQKu/++P/AK9H/CN+Jv8AoFXf/fH/ANelzx7mf13Df8/I/ejJorW/4RvxN/0Crv8A74/+vR/wjfib/oFXf/fH/wBejnj3D67hv+fkfvRk0Vrf8I34m/6BV3/3x/8AXo/4RvxN/wBAq7/74/8Ar0c8e4fXcN/z8j96Mmitb/hG/E3/AECrv/vj/wCvR/wjfib/AKBV3/3x/wDXo549w+u4b/n5H70ZNFa3/CN+Jv8AoFXf/fH/ANej/hG/E3/QKu/++P8A69HPHuH13Df8/I/ejJorW/4RvxN/0Crv/vj/AOvR/wAI34m/6BV3/wB8f/Xo549w+u4b/n5H70ZNFa3/AAjfib/oFXf/AHx/9ej/AIRvxN/0Crv/AL4/+vRzx7h9dw3/AD8j96Mmitb/AIRvxN/0Crv/AL4/+vR/wjfib/oFXf8A3x/9ejnj3D67hv8An5H70ZNFa3/C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/wAK8+ph5yk2j4HMeHsXicVOtBxs33f+R6zRXk3/AAm3in/n4g/8B4v8KP8AhNvFP/PxB/4Dxf4VH1WZw/6rY3vH73/kes0V5N/wm3in/n4g/wDAeL/Cj/hNvFP/AD8Qf+A8X+FH1WYf6rY3vH73/kes0V5N/wAJt4p/5+IP/AeL/Cj/AITbxT/z8Qf+A8X+FH1WYf6rY3vH73/kes0V5N/wm3in/n4g/wDAeL/Cj/hNvFP/AD8Qf+A8X+FH1WYf6rY3vH73/kes0V5N/wAJt4p/5+IP/AeL/Cj/AITbxT/z8Qf+A8X+FH1WYf6rY3vH73/kes0V5N/wm3in/n4g/wDAeL/Cj/hNvFP/AD8Qf+A8X+FH1WYf6rY3vH73/kes0V5N/wAJt4p/5+IP/AeL/Cj/AITbxT/z8Qf+A8X+FH1WYf6rY3vH73/kes0V5N/wm3in/n4g/wDAeL/Cj/hNvFP/AD8Qf+A8X+FH1WYf6rY3vH73/keka7/yBdc/7B93/wCimrxOt+48X+JLqC4tpp4TFcRSQygQRglHUqQCBWBXVQpummmfV5FltbL6c4Vmrt30Ciiiuk+hCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKWkpaBoQ0UGigQUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFLSUtA0IaKDRQIKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClpKWgaENFBooEFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABS0lLQNCGig0UCCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigApaSloGhDRQaKBBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUtJS0DQhBBIIII4IPUGipZv8AWzf9dH/majpIFqriUUtFMdhKKWigLCUUtFAWEopaKAsJRS0UBYSilooCwlFLRQFhKKWigLCUUtFAWEopaKAsJRS0UBYSilooCwlFLRQFhKKWigLCUUtFAWEopaKAsJRS0UBYSilooCwlFLRQFhKKWigLCUUtFAWEopaKAsJRS0UBYSilooCwlFLRQFhKKWigLCUUtFAWEopaKAsJUgimIBEchB5BCtgimVsQ/wCqh/65p/IVnOXKc9eq6KTR/9k=" alt="Deutsche Telekom" style="height:30px; display:block;">
+  </div>
+  <div>
+    <h1>Transcritor de Reuniões — DTGBS</h1>
+    <p>Transcrição automática com resumo executivo via IA</p>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span id="header-user"></span>
+    <button id="btn-logout" hidden>Sair</button>
+  </div>
+</header>
+
+<!-- ── TELA: LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">DT</div>
+    <h2>Entrar</h2>
+    <p>Transcritor de Reuniões — DTGBS</p>
+    <div class="form-group">
+      <label for="input-email">Email</label>
+      <input type="email" id="input-email" placeholder="seu@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label for="input-password">Senha</label>
+      <input type="password" id="input-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button id="btn-login">Entrar</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── TELA: APP ── -->
+<div id="app-screen" hidden>
+<main>
+  <div class="card">
+    <!-- DROP ZONE -->
+    <div id="drop-zone" role="button" tabindex="0" aria-label="Clique ou arraste um arquivo">
+      <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+      </svg>
+      <p>Arraste um arquivo aqui ou <strong>clique para selecionar</strong></p>
+      <p style="font-size:0.82rem;color:#999;margin-top:6px;">
+        MP4, MP3, M4A, WAV, OGG, WEBM — vídeos MP4 são convertidos automaticamente para áudio
+      </p>
+      <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.mpeg,.mpga" />
+    </div>
+
+    <!-- AVISO TAMANHO -->
+    <div class="size-warning">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+      </svg>
+      <span>
+        Vídeos MP4 são <strong>convertidos automaticamente para áudio</strong> no seu browser antes do envio.
+        Limite de 25 MB após conversão (~68 min de reunião). Para reuniões longas, envie por partes.
+      </span>
+    </div>
+
+    <!-- INFO DO ARQUIVO -->
+    <div id="file-info" style="display:none" class="file-selected">
+      <span class="file-icon">&#127925;</span>
+      <div>
+        <strong id="file-name">—</strong><br/>
+        <span id="file-size" style="color:#888;font-size:0.82rem;">—</span>
+        <span id="file-size-warn" class="file-size-warn" style="display:none"> — ARQUIVO MUITO GRANDE!</span>
+      </div>
+    </div>
+
+    <!-- EXTRAÇÃO (ffmpeg.wasm) -->
+    <div id="extraction-section">
+      <div id="extraction-running" class="extraction-row">
+        <svg width="16" height="16" fill="none" stroke="#1a5fa8" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+        </svg>
+        <span id="extraction-text">Extraindo áudio...</span>
+      </div>
+      <div class="extraction-bar-bg">
+        <div class="extraction-bar-fill" id="extraction-bar"></div>
+      </div>
+      <div id="extraction-done" class="extraction-done" style="display:none">
+        <svg width="16" height="16" fill="none" stroke="#1a7f3c" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+        </svg>
+        <span id="extraction-done-text">Áudio extraído com sucesso!</span>
+      </div>
+    </div>
+
+    <!-- CONTROLES -->
+    <div class="controls">
+      <div class="field-group">
+        <label for="language-select">Idioma do áudio</label>
+        <select id="language-select">
+          <option value="auto">Automático (detectar)</option>
+          <option value="pt">Português</option>
+          <option value="en">Inglês</option>
+          <option value="de">Alemão</option>
+        </select>
+      </div>
+      <button id="btn-transcribe" disabled>
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/>
+        </svg>
+        Transcrever
+      </button>
+    </div>
+
+    <!-- PROGRESSO TRANSCRIÇÃO -->
+    <div id="progress-section">
+      <div class="progress-label">
+        <span id="progress-text">Enviando arquivo...</span>
+        <span id="progress-elapsed">0s</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-bar"></div>
+      </div>
+    </div>
+
+    <!-- ERRO -->
+    <div id="error-section" class="hidden">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+      </svg>
+      <span id="error-text">Erro desconhecido.</span>
+    </div>
+  </div>
+
+  <!-- RESULTADO -->
+  <div class="card" id="result-section">
+    <div class="result-meta">
+      <div class="badge">Arquivo: <strong id="meta-filename">—</strong></div>
+      <div class="badge">Idioma detectado: <strong id="meta-language">—</strong></div>
+      <div class="badge">Tempo de processamento: <strong id="meta-time">—</strong></div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="summary">Resumo</button>
+      <button class="tab-btn" data-tab="transcript">Transcript Completo</button>
+    </div>
+    <div class="tab-panel active" id="tab-summary">
+      <div class="result-box" id="summary-text"></div>
+      <div class="result-actions">
+        <button class="btn-secondary" id="copy-summary">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/>
+          </svg>
+          Copiar Resumo
+        </button>
+        <button class="btn-secondary" id="download-summary">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+          </svg>
+          Download Resumo
+        </button>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-transcript">
+      <div class="result-box" id="transcript-text"></div>
+      <div class="result-actions">
+        <button class="btn-secondary" id="copy-transcript">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/>
+          </svg>
+          Copiar Transcript
+        </button>
+        <button class="btn-secondary" id="download-transcript">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+          </svg>
+          Download Transcript
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>DTGBS — Deutsche Telekom Global Business Services &nbsp;|&nbsp; Powered by Groq Whisper + Azure OpenAI</footer>
+</div><!-- fim #app-screen -->
+
+<script>
+  // ================================================================
+  // ELEMENTOS
+  // ================================================================
+  const dropZone        = document.getElementById('drop-zone');
+  const fileInput       = document.getElementById('file-input');
+  const fileInfo        = document.getElementById('file-info');
+  const fileName        = document.getElementById('file-name');
+  const fileSize        = document.getElementById('file-size');
+  const fileSizeWarn    = document.getElementById('file-size-warn');
+  const btnTranscribe   = document.getElementById('btn-transcribe');
+  const extractionSec   = document.getElementById('extraction-section');
+  const extractionRun   = document.getElementById('extraction-running');
+  const extractionText  = document.getElementById('extraction-text');
+  const extractionBar   = document.getElementById('extraction-bar');
+  const extractionDone  = document.getElementById('extraction-done');
+  const extractionDoneT = document.getElementById('extraction-done-text');
+  const progressSec     = document.getElementById('progress-section');
+  const progressText    = document.getElementById('progress-text');
+  const progressElapsed = document.getElementById('progress-elapsed');
+  const progressBar     = document.getElementById('progress-bar');
+  const errorSec        = document.getElementById('error-section');
+  const errorText       = document.getElementById('error-text');
+  const resultSec       = document.getElementById('result-section');
+  const summaryText     = document.getElementById('summary-text');
+  const transcriptText  = document.getElementById('transcript-text');
+  const metaFilename    = document.getElementById('meta-filename');
+  const metaLanguage    = document.getElementById('meta-language');
+  const metaTime        = document.getElementById('meta-time');
+  const langSelect      = document.getElementById('language-select');
+
+  const MAX_SIZE   = 25 * 1024 * 1024;
+  const VIDEO_EXTS = /\.(mp4|mov|avi|mpeg|mpg|mkv|m4v|wmv)$/i;
+
+  // ================================================================
+  // ESTADO
+  // ================================================================
+  let selectedFile = null;  // arquivo original do usuário
+  let fileToSend   = null;  // arquivo que será enviado (pode ser áudio extraído)
+  let elapsedTimer = null;
+
+  // ================================================================
+  // DRAG & DROP
+  // ================================================================
+  dropZone.addEventListener('click',   () => fileInput.click());
+  dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) setFile(fileInput.files[0]);
+  });
+
+  function isVideo(file) {
+    return file.type.startsWith('video/') || VIDEO_EXTS.test(file.name);
+  }
+
+  function setFile(f) {
+    selectedFile = f;
+    fileToSend   = null;
+    btnTranscribe.disabled = true;
+    hideError();
+    resultSec.style.display   = 'none';
+    extractionSec.style.display = 'none';
+    extractionDone.style.display = 'none';
+    extractionRun.style.display  = 'flex';
+
+    // Mostrar info do arquivo
+    fileName.textContent = f.name;
+    fileSize.textContent = (f.size / 1024 / 1024).toFixed(2) + ' MB';
+    fileInfo.style.display = 'flex';
+    fileSizeWarn.style.display = 'none';
+
+    if (isVideo(f)) {
+      // Vídeo: extrai áudio automaticamente
+      extractAudio(f);
+    } else {
+      // Áudio direto
+      fileToSend = f;
+      if (f.size > MAX_SIZE) {
+        fileSizeWarn.style.display = 'inline';
+      } else {
+        btnTranscribe.disabled = false;
+      }
+    }
+  }
+
+  // ================================================================
+  // EXTRAÇÃO DE ÁUDIO — lamejs + AudioContext nativo
+  // Funciona em file://, GitHub Pages e qualquer origem.
+  // Não usa WASM nem Web Workers externos.
+  // ================================================================
+  async function loadLame() {
+    if (typeof lamejs !== 'undefined') return;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';
+      s.onload  = resolve;
+      s.onerror = () => reject(new Error('Falha ao carregar encoder. Verifique sua conexão.'));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function extractAudio(videoFile) {
+    extractionSec.style.display  = 'block';
+    extractionRun.style.display  = 'flex';
+    extractionDone.style.display = 'none';
+    extractionBar.style.width    = '0%';
+    btnTranscribe.disabled       = true;
+    hideError();
+
+    try {
+      // 1. Carregar lamejs (~380 KB — muito menor que ffmpeg.wasm)
+      extractionText.textContent = 'Carregando encoder (~380 KB)...';
+      extractionBar.style.width  = '5%';
+      await loadLame();
+
+      // 2. Ler arquivo
+      extractionText.textContent = 'Lendo arquivo...';
+      extractionBar.style.width  = '10%';
+      const arrayBuffer = await videoFile.arrayBuffer();
+
+      // 3. Decodificar áudio via AudioContext nativo do browser
+      extractionText.textContent = 'Decodificando áudio do vídeo...';
+      extractionBar.style.width  = '20%';
+      const audioCtx = new AudioContext();
+      let decoded;
+      try {
+        decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        throw new Error('Não foi possível decodificar o áudio. Verifique se o arquivo não está corrompido.');
+      }
+      await audioCtx.close();
+
+      // 4. Resample para 16 kHz mono (ideal para Whisper, reduz tamanho ~3x)
+      extractionText.textContent = 'Convertendo para 16 kHz mono...';
+      extractionBar.style.width  = '35%';
+      const targetRate = 16000;
+      const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * targetRate), targetRate);
+      const src = offline.createBufferSource();
+      src.buffer = decoded;
+      src.connect(offline.destination);
+      src.start(0);
+      const resampled = await offline.startRendering();
+
+      // 5. Encode MP3 48 kbps (~22 MB/hora) em lotes — UI não trava
+      const samples      = resampled.getChannelData(0);
+      const totalSamples = samples.length;
+      const encoder      = new lamejs.Mp3Encoder(1, targetRate, 48);
+      const mp3Chunks    = [];
+      const blockSize    = 1152;
+
+      // Float32 [-1,1] → Int16
+      const pcm = new Int16Array(totalSamples);
+      for (let i = 0; i < totalSamples; i++) {
+        pcm[i] = Math.max(-32768, Math.min(32767, samples[i] * 32767));
+      }
+
+      // Lotes de 200 blocos com yield para o browser atualizar a UI
+      const batchBlocks = 200;
+      await new Promise(resolve => {
+        function encodeBatch(start) {
+          const end = Math.min(start + blockSize * batchBlocks, totalSamples);
+          for (let i = start; i < end; i += blockSize) {
+            const buf = encoder.encodeBuffer(pcm.subarray(i, Math.min(i + blockSize, totalSamples)));
+            if (buf.length > 0) mp3Chunks.push(new Uint8Array(buf));
+          }
+          const pct = 35 + Math.round((end / totalSamples) * 60);
+          extractionBar.style.width  = pct + '%';
+          extractionText.textContent = 'Codificando MP3... ' + Math.round((end / totalSamples) * 100) + '%';
+          if (end < totalSamples) setTimeout(() => encodeBatch(end), 0);
+          else resolve();
+        }
+        encodeBatch(0);
+      });
+
+      const finalBuf = encoder.flush();
+      if (finalBuf.length > 0) mp3Chunks.push(new Uint8Array(finalBuf));
+
+      const audioBlob = new Blob(mp3Chunks, { type: 'audio/mpeg' });
+      const audioName = videoFile.name.replace(/\.[^.]+$/, '.mp3');
+      const audioFile = new File([audioBlob], audioName, { type: 'audio/mpeg' });
+
+      // Verificar tamanho
+      if (audioFile.size > MAX_SIZE) {
+        const sizeMB = (audioFile.size / 1024 / 1024).toFixed(1);
+        showError('Áudio muito grande após conversão: ' + sizeMB + ' MB (limite 25 MB). Divida a gravação em partes de até ~68 min.');
+        extractionSec.style.display = 'none';
+        return;
+      }
+
+      fileToSend = audioFile;
+
+      // Atualizar UI
+      const origMB  = (videoFile.size / 1024 / 1024).toFixed(1);
+      const audioMB = (audioFile.size  / 1024 / 1024).toFixed(1);
+      fileSize.textContent = origMB + ' MB → ' + audioMB + ' MB (áudio extraído)';
+
+      extractionBar.style.width    = '100%';
+      extractionRun.style.display  = 'none';
+      extractionDone.style.display = 'flex';
+      extractionDoneT.textContent  = 'Áudio extraído: ' + audioMB + ' MB — pronto para transcrever';
+      btnTranscribe.disabled = false;
+
+    } catch (err) {
+      showError('Erro ao extrair áudio: ' + (err.message || err));
+      extractionSec.style.display = 'none';
+    }
+  }
+
+  // ================================================================
+  // TABS
+  // ================================================================
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ================================================================
+  // TIMER
+  // ================================================================
+  function startTimer() {
+    const start = Date.now();
+    elapsedTimer = setInterval(() => {
+      const sec = Math.round((Date.now() - start) / 1000);
+      progressElapsed.textContent = sec + 's';
+      if (sec < 5)        progressText.textContent = 'Enviando arquivo...';
+      else if (sec < 20)  progressText.textContent = 'Transcrevendo com Groq Whisper...';
+      else if (sec < 50)  progressText.textContent = 'Gerando resumo com Azure OpenAI...';
+      else                progressText.textContent = 'Finalizando...';
+    }, 1000);
+  }
+  function stopTimer() { if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; } }
+
+  // ================================================================
+  // UI HELPERS
+  // ================================================================
+  function showError(msg) {
+    errorText.textContent = msg;
+    errorSec.classList.remove('hidden');
+  }
+  function hideError() { errorSec.classList.add('hidden'); }
+
+  function setProcessing(on) {
+    btnTranscribe.disabled = on;
+    btnTranscribe.innerHTML = on
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 1s linear infinite"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg> Processando...'
+      : '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg> Transcrever';
+    progressSec.style.display = on ? 'block' : 'none';
+    if (on) {
+      progressBar.classList.remove('done');
+      startTimer();
+    } else {
+      stopTimer();
+    }
+  }
+
+  // ================================================================
+  // TRANSCRIÇÃO
+  // ================================================================
+  btnTranscribe.addEventListener('click', async () => {
+    if (!fileToSend) return;
+    if (WEBHOOK_URL === 'SUA_URL_AQUI') {
+      showError('Configure a variável WEBHOOK_URL no topo do arquivo index.html.');
+      return;
+    }
+
+    hideError();
+    resultSec.style.display = 'none';
+    setProcessing(true);
+
+    const formData = new FormData();
+    formData.append('file', fileToSend, fileToSend.name);
+    const lang = langSelect.value;
+    if (lang !== 'auto') formData.append('language', lang);
+
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST', body: formData, signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let msg = 'Erro HTTP ' + response.status;
+        try { const b = await response.json(); if (b.message) msg = b.message; } catch(_) {}
+        throw new Error(msg);
+      }
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.message || 'Erro retornado pelo servidor.');
+
+      // Sucesso
+      progressBar.classList.add('done');
+      stopTimer();
+
+      summaryText.textContent    = data.summary    || '(sem resumo)';
+      transcriptText.textContent = data.transcript || '(sem transcript)';
+      metaFilename.textContent   = data.filename   || selectedFile.name;
+      metaLanguage.textContent   = data.language_detected || '—';
+      metaTime.textContent       = (data.processing_time_seconds || 0) + 's';
+
+      resultSec.style.display = 'block';
+      resultSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        showError('Tempo limite excedido (10 min). Tente com uma parte menor da gravação.');
+      } else if (!navigator.onLine) {
+        showError('Sem conexão com a internet.');
+      } else {
+        showError(err.message || 'Erro desconhecido.');
+      }
+    } finally {
+      setProcessing(false);
+    }
+  });
+
+  // ================================================================
+  // COPIAR & DOWNLOAD
+  // ================================================================
+  async function copyText(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const orig = btn.innerHTML;
+      btn.innerHTML = btn.innerHTML.replace(/Copiar \w+/, 'Copiado!');
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    } catch(_) { showError('Não foi possível copiar. Selecione o texto manualmente.'); }
+  }
+
+  function downloadTxt(content, prefix) {
+    const today = new Date().toISOString().slice(0, 10);
+    const blob  = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = prefix + '_' + today + '.txt';
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  document.getElementById('copy-summary').addEventListener('click',     function() { copyText(summaryText.textContent, this); });
+  document.getElementById('copy-transcript').addEventListener('click',  function() { copyText(transcriptText.textContent, this); });
+  document.getElementById('download-summary').addEventListener('click',    () => downloadTxt(summaryText.textContent,    'summary'));
+  document.getElementById('download-transcript').addEventListener('click', () => downloadTxt(transcriptText.textContent, 'transcript'));
+</script>
+
+</body>
+</html>
