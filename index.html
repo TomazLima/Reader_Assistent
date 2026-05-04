@@ -220,6 +220,26 @@
       margin-top: 14px; display: none;
     }
     #login-error.visible { display: block; }
+    #change-password-screen {
+      min-height: calc(100vh - 60px);
+      display: flex; justify-content: center; align-items: center;
+      padding: 24px; background: #f4f4f4;
+    }
+    #btn-change-pwd {
+      width: 100%; padding: 12px; background: #E2007A; color: #fff;
+      border: none; border-radius: 10px; font-family: inherit;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      margin-top: 4px; transition: background .2s;
+    }
+    #btn-change-pwd:hover    { background: #c0006a; }
+    #btn-change-pwd:disabled { background: #bdbdbd; cursor: default; }
+    #chpwd-error {
+      font-size: 13px; color: #d32f2f;
+      background: #fff3f3; border: 1px solid #ffcdd2;
+      border-radius: 8px; padding: 10px 12px;
+      margin-top: 14px; display: none;
+    }
+    #chpwd-error.visible { display: block; }
     #btn-logout {
       background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.4);
       color: #fff; padding: 5px 14px; border-radius: 20px;
@@ -290,7 +310,13 @@
       document.getElementById('header-user').textContent = user.name;
       document.getElementById('btn-logout').hidden = false;
       document.getElementById('login-screen').hidden = true;
-      document.getElementById('app-screen').hidden = false;
+      document.getElementById('change-password-screen').hidden = true;
+      if (user.must_change_password) {
+        document.getElementById('app-screen').hidden = true;
+        document.getElementById('change-password-screen').hidden = false;
+      } else {
+        document.getElementById('app-screen').hidden = false;
+      }
     }
 
     function doLogout() {
@@ -299,11 +325,58 @@
       document.getElementById('header-user').textContent = '';
       document.getElementById('btn-logout').hidden = true;
       document.getElementById('app-screen').hidden = true;
+      document.getElementById('change-password-screen').hidden = true;
       document.getElementById('login-screen').hidden = false;
       inputEmail.value = '';
       inputPwd.value = '';
       hideLoginError();
     }
+
+    // ── TROCA DE SENHA ──────────────────────────────────────────────
+    const chpwdError   = document.getElementById('chpwd-error');
+    const btnChangePwd = document.getElementById('btn-change-pwd');
+    const inputNewPwd  = document.getElementById('input-new-pwd');
+    const inputConfPwd = document.getElementById('input-confirm-pwd');
+
+    function showChpwdError(msg) { chpwdError.textContent = msg; chpwdError.classList.add('visible'); }
+    function hideChpwdError()    { chpwdError.classList.remove('visible'); }
+
+    async function doChangePassword() {
+      const newPwd  = inputNewPwd.value;
+      const confPwd = inputConfPwd.value;
+      if (!newPwd || newPwd.length < 6) { showChpwdError('A senha deve ter pelo menos 6 caracteres.'); return; }
+      if (newPwd !== confPwd)           { showChpwdError('As senhas não coincidem.'); return; }
+
+      btnChangePwd.disabled = true;
+      btnChangePwd.textContent = 'Salvando...';
+      hideChpwdError();
+
+      try {
+        const res = await fetch(AUTH_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': AUTH_KEY },
+          body: JSON.stringify({ action: 'change_password', user_id: currentUser.id, new_password: newPwd })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const updatedUser = { ...currentUser, must_change_password: false };
+          localStorage.setItem('dt_transcriber_user', JSON.stringify(updatedUser));
+          inputNewPwd.value = '';
+          inputConfPwd.value = '';
+          startApp(updatedUser);
+        } else {
+          showChpwdError(data.error || 'Erro ao salvar senha. Tente novamente.');
+        }
+      } catch(e) {
+        showChpwdError('Erro de conexão. Tente novamente.');
+      } finally {
+        btnChangePwd.disabled = false;
+        btnChangePwd.textContent = 'Salvar senha';
+      }
+    }
+
+    btnChangePwd.addEventListener('click', doChangePassword);
+    inputConfPwd.addEventListener('keydown', e => { if (e.key === 'Enter') doChangePassword(); });
 
     btnLogin.addEventListener('click', doLogin);
     inputPwd.addEventListener('keydown',   e => { if (e.key === 'Enter') doLogin(); });
@@ -349,6 +422,25 @@
     </div>
     <button id="btn-login">Entrar</button>
     <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── TELA: TROCA DE SENHA ── -->
+<div id="change-password-screen" hidden>
+  <div class="login-card">
+    <div class="login-logo">DT</div>
+    <h2>Defina sua senha</h2>
+    <p>Este é seu primeiro acesso. Por favor, crie uma nova senha para continuar.</p>
+    <div class="form-group">
+      <label for="input-new-pwd">Nova senha</label>
+      <input type="password" id="input-new-pwd" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label for="input-confirm-pwd">Confirmar senha</label>
+      <input type="password" id="input-confirm-pwd" placeholder="••••••••">
+    </div>
+    <button id="btn-change-pwd">Salvar senha</button>
+    <div id="chpwd-error"></div>
   </div>
 </div>
 
