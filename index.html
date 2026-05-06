@@ -89,6 +89,17 @@
       transition: border-color 0.2s;
     }
     select:focus { border-color: #E2007A; }
+    select { width: 100%; }
+
+    .meeting-meta { display: flex; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+    .meeting-meta .field-group { flex: 1; min-width: 160px; }
+    .meeting-meta .field-group.wide { flex: 2; }
+    .field-group input[type="text"] {
+      padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 0.92rem; background: #fff; outline: none;
+      transition: border-color 0.2s; font-family: inherit; width: 100%;
+    }
+    .field-group input[type="text"]:focus { border-color: #E2007A; }
 
     button#btn-transcribe {
       flex: 1; min-width: 160px; padding: 12px 28px;
@@ -501,6 +512,35 @@
       </div>
     </div>
 
+    <!-- METADADOS DA REUNIÃO -->
+    <div class="meeting-meta">
+      <div class="field-group wide">
+        <label for="meeting-title">Título da Reunião</label>
+        <input type="text" id="meeting-title" placeholder="Ex: Alinhamento Sprint 12" maxlength="255">
+      </div>
+      <div class="field-group">
+        <label for="meeting-area">Área</label>
+        <select id="meeting-area">
+          <option value="">Selecione...</option>
+          <option value="Finance & Controlling">Finance &amp; Controlling</option>
+          <option value="IT">IT</option>
+          <option value="Facilities">Facilities</option>
+          <option value="Legal">Legal</option>
+          <option value="HR">HR</option>
+          <option value="Board">Board</option>
+          <option value="Sales">Sales</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Fixed Connectivity">Fixed Connectivity</option>
+          <option value="Mobile Connectivity">Mobile Connectivity</option>
+          <option value="IOT">IOT</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="meeting-date">Data da Reunião</label>
+        <input type="text" id="meeting-date" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric">
+      </div>
+    </div>
+
     <!-- CONTROLES -->
     <div class="controls">
       <div class="field-group">
@@ -621,6 +661,9 @@
   const metaLanguage    = document.getElementById('meta-language');
   const metaTime        = document.getElementById('meta-time');
   const langSelect      = document.getElementById('language-select');
+  const meetingTitle    = document.getElementById('meeting-title');
+  const meetingArea     = document.getElementById('meeting-area');
+  const meetingDate     = document.getElementById('meeting-date');
 
   const MAX_SIZE   = 25 * 1024 * 1024;
   const VIDEO_EXTS = /\.(mp4|mov|avi|mpeg|mpg|mkv|m4v|wmv)$/i;
@@ -631,6 +674,42 @@
   let selectedFile = null;  // arquivo original do usuário
   let fileToSend   = null;  // arquivo que será enviado (pode ser áudio extraído)
   let elapsedTimer = null;
+
+  // ================================================================
+  // VALIDAÇÃO E MÁSCARA DE DATA
+  // ================================================================
+  function isDateValid(v) {
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(v)) return false;
+    const [d, m, y] = v.split('/').map(Number);
+    return m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 2000;
+  }
+
+  function canTranscribe() {
+    return !!(fileToSend && fileToSend.size <= MAX_SIZE
+      && meetingTitle.value.trim().length > 0
+      && meetingArea.value !== ''
+      && isDateValid(meetingDate.value));
+  }
+
+  function updateTranscribeBtn() {
+    btnTranscribe.disabled = !canTranscribe();
+  }
+
+  // Máscara dd/mm/aaaa — aceita apenas dígitos e insere barras automaticamente
+  meetingDate.addEventListener('keydown', e => {
+    const nav = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'];
+    if (!nav.includes(e.key) && !/^\d$/.test(e.key)) e.preventDefault();
+  });
+  meetingDate.addEventListener('input', () => {
+    let v = meetingDate.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) v = v.slice(0,2) + '/' + v.slice(2,4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+    meetingDate.value = v;
+    updateTranscribeBtn();
+  });
+
+  meetingTitle.addEventListener('input',  updateTranscribeBtn);
+  meetingArea.addEventListener('change',  updateTranscribeBtn);
 
   // ================================================================
   // DRAG & DROP
@@ -676,7 +755,7 @@
       if (f.size > MAX_SIZE) {
         fileSizeWarn.style.display = 'inline';
       } else {
-        btnTranscribe.disabled = false;
+        updateTranscribeBtn();
       }
     }
   }
@@ -796,7 +875,7 @@
       extractionRun.style.display  = 'none';
       extractionDone.style.display = 'flex';
       extractionDoneT.textContent  = 'Áudio extraído: ' + audioMB + ' MB — pronto para transcrever';
-      btnTranscribe.disabled = false;
+      updateTranscribeBtn();
 
     } catch (err) {
       showError('Erro ao extrair áudio: ' + (err.message || err));
@@ -871,6 +950,10 @@
 
     const formData = new FormData();
     formData.append('file', fileToSend, fileToSend.name);
+    formData.append('titulo', meetingTitle.value.trim());
+    formData.append('area', meetingArea.value);
+    formData.append('data_reuniao', meetingDate.value);
+    formData.append('user_id', currentUser.id);
     const lang = langSelect.value;
     if (lang !== 'auto') formData.append('language', lang);
 
