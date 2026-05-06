@@ -161,9 +161,15 @@
     .result-box {
       background: #fafafa; border: 1px solid #e8e8e8; border-radius: 8px;
       padding: 18px 20px; font-size: 0.92rem; line-height: 1.7;
-      white-space: pre-wrap; word-break: break-word;
-      max-height: 420px; overflow-y: auto; color: #222;
+      word-break: break-word; max-height: 420px; overflow-y: auto; color: #222;
     }
+    .result-box.plain { white-space: pre-wrap; }
+    .result-box h4 { font-size: 0.95rem; font-weight: 700; margin: 16px 0 6px; color: #111; }
+    .result-box h4:first-child { margin-top: 0; }
+    .result-box ul { margin: 4px 0 10px 18px; padding: 0; }
+    .result-box li { margin-bottom: 4px; }
+    .result-box hr { border: none; border-top: 1px solid #e0e0e0; margin: 14px 0; }
+    .result-box p  { margin: 4px 0; }
     .result-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
     .btn-secondary {
       padding: 8px 18px; border: 1.5px solid #E2007A; color: #E2007A;
@@ -609,7 +615,7 @@
       </div>
     </div>
     <div class="tab-panel" id="tab-transcript">
-      <div class="result-box" id="transcript-text"></div>
+      <div class="result-box plain" id="transcript-text"></div>
       <div class="result-actions">
         <button class="btn-secondary" id="copy-transcript">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -979,7 +985,7 @@
       progressBar.classList.add('done');
       stopTimer();
 
-      summaryText.textContent    = data.summary    || '(sem resumo)';
+      summaryText.innerHTML      = renderMarkdown(data.summary) || '(sem resumo)';
       transcriptText.textContent = data.transcript || '(sem transcript)';
       metaFilename.textContent   = data.filename   || selectedFile.name;
       metaLanguage.textContent   = data.language_detected || '—';
@@ -1003,6 +1009,55 @@
   });
 
   // ================================================================
+  // RENDERIZADOR DE MARKDOWN
+  // ================================================================
+  function formatInline(text) {
+    return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  function renderMarkdown(md) {
+    if (!md) return '';
+    // Remover frases finais de oferta do GPT (fallback)
+    md = md.replace(/\n*Se quiser[\s\S]*$/i, '').trim();
+
+    const lines = md.split('\n');
+    let html = '';
+    let inList = false;
+
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd();
+
+      if (/^---+$/.test(line)) {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += '<hr>';
+        continue;
+      }
+
+      if (line.startsWith('- ')) {
+        if (!inList) { html += '<ul>'; inList = true; }
+        html += '<li>' + formatInline(line.slice(2)) + '</li>';
+        continue;
+      }
+
+      if (inList) { html += '</ul>'; inList = false; }
+
+      if (!line) continue;
+
+      // Linha inteiramente em negrito = título de seção
+      const headerMatch = line.match(/^\*\*(.+?)\*\*\s*$/);
+      if (headerMatch) {
+        html += '<h4>' + headerMatch[1] + '</h4>';
+        continue;
+      }
+
+      html += '<p>' + formatInline(line) + '</p>';
+    }
+
+    if (inList) html += '</ul>';
+    return html;
+  }
+
+  // ================================================================
   // COPIAR & DOWNLOAD
   // ================================================================
   async function copyText(text, btn) {
@@ -1023,7 +1078,7 @@
     a.click(); URL.revokeObjectURL(url);
   }
 
-  document.getElementById('copy-summary').addEventListener('click',     function() { copyText(summaryText.textContent, this); });
+  document.getElementById('copy-summary').addEventListener('click',     function() { copyText(summaryText.innerText, this); });
   document.getElementById('copy-transcript').addEventListener('click',  function() { copyText(transcriptText.textContent, this); });
   document.getElementById('download-summary').addEventListener('click',    () => downloadTxt(summaryText.textContent,    'summary'));
   document.getElementById('download-transcript').addEventListener('click', () => downloadTxt(transcriptText.textContent, 'transcript'));
