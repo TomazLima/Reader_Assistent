@@ -799,7 +799,12 @@
       // 2. Ler arquivo
       extractionText.textContent = 'Lendo arquivo...';
       extractionBar.style.width  = '10%';
-      const arrayBuffer = await videoFile.arrayBuffer();
+      const arrayBuffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(new Error('Erro ao ler arquivo: ' + (e.target.error?.message || 'permissão negada pelo sistema')));
+        reader.readAsArrayBuffer(videoFile);
+      });
 
       // 3. Decodificar áudio via AudioContext nativo do browser
       extractionText.textContent = 'Decodificando áudio do vídeo...';
