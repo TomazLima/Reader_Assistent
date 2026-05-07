@@ -753,8 +753,11 @@
     fileSizeWarn.style.display = 'none';
 
     if (isVideo(f)) {
-      // Vídeo: extrai áudio automaticamente
-      extractAudio(f);
+      // Ler arquivo IMEDIATAMENTE antes do DLP invalidar a referência
+      const reader = new FileReader();
+      reader.onload = e => extractAudio(f, e.target.result);
+      reader.onerror = e => showError('Erro ao ler arquivo: ' + (e.target.error?.message || 'permissão negada pelo sistema'));
+      reader.readAsArrayBuffer(f);
     } else {
       // Áudio direto
       fileToSend = f;
@@ -782,7 +785,7 @@
     });
   }
 
-  async function extractAudio(videoFile) {
+  async function extractAudio(videoFile, preloadedBuffer) {
     extractionSec.style.display  = 'block';
     extractionRun.style.display  = 'flex';
     extractionDone.style.display = 'none';
@@ -799,7 +802,7 @@
       // 2. Ler arquivo
       extractionText.textContent = 'Lendo arquivo...';
       extractionBar.style.width  = '10%';
-      const arrayBuffer = await new Promise((resolve, reject) => {
+      const arrayBuffer = preloadedBuffer || await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = e => resolve(e.target.result);
         reader.onerror = e => reject(new Error('Erro ao ler arquivo: ' + (e.target.error?.message || 'permissão negada pelo sistema')));
