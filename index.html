@@ -675,7 +675,7 @@
   const meetingArea     = document.getElementById('meeting-area');
   const meetingDate     = document.getElementById('meeting-date');
 
-  const MAX_SIZE   = 25 * 1024 * 1024;
+  const MAX_SIZE   = 200 * 1024 * 1024;
   const VIDEO_EXTS = /\.(mp4|mov|avi|mpeg|mpg|mkv|m4v|wmv)$/i;
 
   // ================================================================
@@ -877,7 +877,7 @@
       // Verificar tamanho
       if (audioFile.size > MAX_SIZE) {
         const sizeMB = (audioFile.size / 1024 / 1024).toFixed(1);
-        showError('Áudio muito grande após conversão: ' + sizeMB + ' MB (limite 25 MB). Divida a gravação em partes de até ~68 min.');
+        showError('Áudio muito grande após conversão: ' + sizeMB + ' MB (limite 200 MB). Divida a gravação em partes menores.');
         extractionSec.style.display = 'none';
         return;
       }
