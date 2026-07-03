@@ -273,7 +273,7 @@
   // ================================================================
   // CONFIGURAÇÃO — altere a URL do webhook n8n aqui
   // ================================================================
-  const WEBHOOK_URL = 'https://dtgbsn8n.eastus.cloudapp.azure.com/webhook/transcricao-reuniao';
+  const WEBHOOK_URL = 'https://dtgbsn8n.eastus.cloudapp.azure.com/webhook/transcricao-reuniao-dev';
   const TIMEOUT_MS  = 10 * 60 * 1000; // 10 minutos
 
   // ── LOGIN ────────────────────────────────────────────────────────
@@ -429,6 +429,7 @@
     <div class="login-logo">DT</div>
     <h2>Entrar</h2>
     <p>DTGBS MeetInsights</p>
+    <form onsubmit="return false">
     <div class="form-group">
       <label for="input-email">Email</label>
       <input type="email" id="input-email" placeholder="seu@email.com" autocomplete="email">
@@ -439,6 +440,7 @@
     </div>
     <button id="btn-login">Entrar</button>
     <div id="login-error"></div>
+    </form>
   </div>
 </div>
 
@@ -448,6 +450,7 @@
     <div class="login-logo">DT</div>
     <h2>Defina sua senha</h2>
     <p>Este é seu primeiro acesso. Por favor, crie uma nova senha para continuar.</p>
+    <form onsubmit="return false">
     <div class="form-group">
       <label for="input-new-pwd">Nova senha</label>
       <input type="password" id="input-new-pwd" placeholder="••••••••">
@@ -458,6 +461,7 @@
     </div>
     <button id="btn-change-pwd">Salvar senha</button>
     <div id="chpwd-error"></div>
+    </form>
   </div>
 </div>
 
@@ -671,7 +675,7 @@
   const meetingArea     = document.getElementById('meeting-area');
   const meetingDate     = document.getElementById('meeting-date');
 
-  const MAX_SIZE   = 25 * 1024 * 1024;
+  const MAX_SIZE   = 200 * 1024 * 1024;
   const VIDEO_EXTS = /\.(mp4|mov|avi|mpeg|mpg|mkv|m4v|wmv)$/i;
 
   // ================================================================
@@ -753,8 +757,11 @@
     fileSizeWarn.style.display = 'none';
 
     if (isVideo(f)) {
-      // Vídeo: extrai áudio automaticamente
-      extractAudio(f);
+      // Ler arquivo IMEDIATAMENTE antes do DLP invalidar a referência
+      const reader = new FileReader();
+      reader.onload = e => extractAudio(f, e.target.result);
+      reader.onerror = e => showError('Erro ao ler arquivo: ' + (e.target.error?.message || 'permissão negada pelo sistema'));
+      reader.readAsArrayBuffer(f);
     } else {
       // Áudio direto
       fileToSend = f;
@@ -782,7 +789,7 @@
     });
   }
 
-  async function extractAudio(videoFile) {
+  async function extractAudio(videoFile, preloadedBuffer) {
     extractionSec.style.display  = 'block';
     extractionRun.style.display  = 'flex';
     extractionDone.style.display = 'none';
@@ -799,7 +806,12 @@
       // 2. Ler arquivo
       extractionText.textContent = 'Lendo arquivo...';
       extractionBar.style.width  = '10%';
-      const arrayBuffer = await videoFile.arrayBuffer();
+      const arrayBuffer = preloadedBuffer || await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(new Error('Erro ao ler arquivo: ' + (e.target.error?.message || 'permissão negada pelo sistema')));
+        reader.readAsArrayBuffer(videoFile);
+      });
 
       // 3. Decodificar áudio via AudioContext nativo do browser
       extractionText.textContent = 'Decodificando áudio do vídeo...';
@@ -865,7 +877,7 @@
       // Verificar tamanho
       if (audioFile.size > MAX_SIZE) {
         const sizeMB = (audioFile.size / 1024 / 1024).toFixed(1);
-        showError('Áudio muito grande após conversão: ' + sizeMB + ' MB (limite 25 MB). Divida a gravação em partes de até ~68 min.');
+        showError('Áudio muito grande após conversão: ' + sizeMB + ' MB (limite 200 MB). Divida a gravação em partes menores.');
         extractionSec.style.display = 'none';
         return;
       }
