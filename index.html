@@ -986,7 +986,8 @@
 
     try {
       const response = await fetch(WEBHOOK_URL, {
-        method: 'POST', body: formData, signal: controller.signal
+        method: 'POST', body: formData, signal: controller.signal,
+        headers: { 'X-API-Key': AUTH_KEY }
       });
       clearTimeout(timeoutId);
 
